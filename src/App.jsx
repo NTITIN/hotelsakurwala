@@ -18,6 +18,7 @@ import { EditInvoiceModal } from './components/billing/EditInvoiceModal';
 import { SalesReports } from './components/reports/SalesReports';
 import { AccountsAndLedgers } from './components/accounting/AccountsAndLedgers';
 import { HotelSettings } from './components/settings/HotelSettings';
+import { ThermalPrinterSetupModal } from './components/settings/ThermalPrinterSetupModal';
 
 const MainApplication = () => {
   const { currentUser } = useAuth();
@@ -27,6 +28,7 @@ const MainApplication = () => {
   // Modal states
   const [selectedTable, setSelectedTable] = useState(null);
   const [isTableDetailOpen, setIsTableDetailOpen] = useState(false);
+  const [isPrinterSetupOpen, setIsPrinterSetupOpen] = useState(false);
 
   const [printModalState, setPrintModalState] = useState({
     isOpen: false,
@@ -113,7 +115,7 @@ const MainApplication = () => {
   return (
     <div className="min-h-screen flex flex-col bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-100">
       {/* Top Navigation Bar */}
-      <Header />
+      <Header onOpenPrinterSetup={() => setIsPrinterSetupOpen(true)} />
 
       {/* Main Container: Sidebar + Content */}
       <div className="flex-1 flex overflow-hidden">
@@ -179,7 +181,9 @@ const MainApplication = () => {
 
           {activeTab === 'accounts' && <AccountsAndLedgers />}
 
-          {activeTab === 'settings' && <HotelSettings />}
+          {activeTab === 'settings' && (
+            <HotelSettings onOpenPrinterSetup={() => setIsPrinterSetupOpen(true)} />
+          )}
         </main>
       </div>
 
@@ -245,6 +249,12 @@ const MainApplication = () => {
       <CategoryManagerModal
         isOpen={isCategoryOpen}
         onClose={() => setIsCategoryOpen(false)}
+      />
+
+      {/* SHREYANS 58mm Thermal Printer Hardware Connection & Test Wizard */}
+      <ThermalPrinterSetupModal
+        isOpen={isPrinterSetupOpen}
+        onClose={() => setIsPrinterSetupOpen(false)}
       />
     </div>
   );

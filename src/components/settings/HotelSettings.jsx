@@ -18,7 +18,7 @@ import {
   Smartphone
 } from 'lucide-react';
 
-export const HotelSettings = () => {
+export const HotelSettings = ({ onOpenPrinterSetup = null }) => {
   const { hotelInfo, setHotelInfo, resetAllDataToDemo } = useHotel();
   const { currentUser } = useAuth();
   const { addToast } = useToast();
@@ -365,6 +365,17 @@ export const HotelSettings = () => {
               Turn ON printer → Open Windows Settings → <strong>Bluetooth &amp; devices</strong> → <strong>Add device</strong> → Select <strong>588</strong> or <strong>MTP-II</strong> (PIN: <code className="text-amber-600 font-mono font-bold">0000</code> or <code className="text-amber-600 font-mono font-bold">1234</code>). In Chrome/Edge Print dialog, choose Paper Size: <strong>58mm x 210mm</strong>, Margins: <strong>None</strong>.
             </p>
           </div>
+
+          {onOpenPrinterSetup && (
+            <button
+              type="button"
+              onClick={onOpenPrinterSetup}
+              className="py-2.5 px-4 rounded-xl bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs flex items-center gap-2 shadow-sm transition"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Launch Thermal Printer Connection &amp; Test Wizard</span>
+            </button>
+          )}
         </div>
 
         {/* Receipt Footer Message */}

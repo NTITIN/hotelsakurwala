@@ -12,7 +12,7 @@ export const PRINTER_SPECS = {
     charsPerLine: 32,
     dotsPerLine: 384,
     defaultBluetoothPin: '0000 / 1234',
-    bluetoothNamePrefixes: ['588', 'MTP', 'POS', 'BlueTooth', 'Printer', 'RPP']
+    bluetoothNamePrefixes: ['588', 'MTP', 'POS', 'BlueTooth', 'Printer', 'RPP', 'MPT']
   },
   THERMAL_80MM: {
     name: 'Standard 80mm POS Printer',
@@ -129,12 +129,12 @@ export const formatThermalLine = (leftText = '', rightText = '', maxChars = 32) 
  * Build Raw ESC/POS bytes for Shreyans 588 Bluetooth / USB Direct Printing
  */
 export const buildEscPos58mm = ({
-  hotelInfo,
-  invoiceNum,
-  tableName,
-  section,
-  guestName,
-  cashierName,
+  hotelInfo = {},
+  invoiceNum = '',
+  tableName = '',
+  section = '',
+  guestName = '',
+  cashierName = 'Admin',
   items = [],
   subtotal = 0,
   taxRate = 5,
@@ -150,10 +150,6 @@ export const buildEscPos58mm = ({
 
   const addBytes = (...bytes) => {
     chunks.push(new Uint8Array(bytes));
-  };
-
-  const addText = (text) => {
-    chunks.push(encoder.encode(text));
   };
 
   const addLine = (text = '') => {
@@ -191,10 +187,12 @@ export const buildEscPos58mm = ({
     addLine('Date      : ' + new Date().toLocaleString());
     addLine('Status    : CONNECTED & READY');
     addLine('Width     : 58mm (32 Columns)');
-    addLine('Interface : Bluetooth / USB');
+    addLine('Thermal   : High Contrast (No Ink)');
+    addLine('Hardware  : SHREYANS Mobile 588');
     addLine(divider);
     addBytes(0x1B, 0x61, 0x01); // Align center
-    addLine('Test Complete! Ready to Print.');
+    addLine('Alignment: [==========] 100%');
+    addLine('Test Successful! Ready for Billing.');
     addLine(divider);
     // Feed and cut
     addLine('\n\n\n');
@@ -220,9 +218,8 @@ export const buildEscPos58mm = ({
   if (cashierName) addLine('Cashier   : ' + cashierName);
   addLine(divider);
 
-  // Column Header
+  // Column Header: 32 chars: "Item                 Qty  Amount"
   addBytes(0x1B, 0x45, 0x01);
-  // 32 chars: "Item                 Qty  Amount"
   addLine(formatThermalLine('Item', 'Qty   Amount', 32));
   addBytes(0x1B, 0x45, 0x00);
   addLine(divider);
@@ -292,6 +289,15 @@ export const buildEscPos58mm = ({
   return concatenateUint8Arrays(chunks);
 };
 
+export const buildFeedPaperEscPos = (lines = 3) => {
+  const encoder = new TextEncoder();
+  const chunks = [
+    new Uint8Array([0x1B, 0x40]), // Init
+    encoder.encode('\n'.repeat(lines))
+  ];
+  return concatenateUint8Arrays(chunks);
+};
+
 const concatenateUint8Arrays = (arrays) => {
   const totalLength = arrays.reduce((acc, curr) => acc + curr.length, 0);
   const result = new Uint8Array(totalLength);
@@ -308,14 +314,15 @@ const concatenateUint8Arrays = (arrays) => {
  */
 export const printViaWebBluetooth = async (rawEscPosData) => {
   if (!navigator.bluetooth) {
-    throw new Error('Web Bluetooth is not supported in this browser. Please use Windows Browser Print (Ctrl+P) with the 58mm format.');
+    throw new Error('Web Bluetooth is not supported in this browser. Please use the Print button to print via Windows Bluetooth driver.');
   }
 
   // Common thermal printer Bluetooth service UUIDs (standard SPP / vendor GATT)
   const PRINTER_SERVICES = [
     '000018f0-0000-1000-8000-00805f9b34fb', // Standard POS Bluetooth service
     'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // MPT-II / 588 Bluetooth
-    '49535343-fe7d-4ae5-8fa9-9fafd205e455'  // Microchip ISSP / Serial
+    '49535343-fe7d-4ae5-8fa9-9fafd205e455',  // Microchip ISSP / Serial
+    '0000e0ff-3c17-d293-8e48-14fe2e4da212'
   ];
 
   try {
@@ -340,7 +347,7 @@ export const printViaWebBluetooth = async (rawEscPosData) => {
     }
 
     if (!writeChar) {
-      throw new Error('Printer connected via Bluetooth, but could not detect ESC/POS write channel. Please use the Print button to print via Windows Bluetooth driver.');
+      throw new Error(`Connected to ${device.name || 'Printer'}, but ESC/POS data channel was not detected. Please use the standard Print button with your Windows Bluetooth driver.`);
     }
 
     // Write data in chunks (BLE maximum transmission unit typically 20-100 bytes)
@@ -352,10 +359,33 @@ export const printViaWebBluetooth = async (rawEscPosData) => {
       } else {
         await writeChar.writeValue(chunk);
       }
-      await new Promise((r) => setTimeout(r, 20)); // Brief pause between chunks
+      await new Promise((r) => setTimeout(r, 25)); // Brief pause between chunks
     }
 
     return { success: true, deviceName: device.name || 'SHREYANS 588' };
+  } catch (err) {
+    throw err;
+  }
+};
+
+/**
+ * Direct Web Serial / USB Cable Connection & Print for Shreyans 588
+ */
+export const printViaWebSerial = async (rawEscPosData) => {
+  if (!navigator.serial) {
+    throw new Error('Web Serial is not supported in this browser. Please use Chrome/Edge or standard Windows Print (Ctrl+P).');
+  }
+
+  try {
+    const port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 9600, dataBits: 8, stopBits: 1, parity: 'none' });
+
+    const writer = port.writable.getWriter();
+    await writer.write(rawEscPosData);
+    writer.releaseLock();
+    await port.close();
+
+    return { success: true, deviceName: 'SHREYANS 588 (USB Serial)' };
   } catch (err) {
     throw err;
   }
